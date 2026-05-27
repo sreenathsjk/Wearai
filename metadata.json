@@ -1,0 +1,6 @@
+{
+  "name": "WearAI",
+  "description": "Next-generation AI-powered virtual try-on and dynamic customizable 3D avatar visualization platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
