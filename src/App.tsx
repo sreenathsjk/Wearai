@@ -301,15 +301,16 @@ export default function App() {
         const parsedNode = await res.json();
 
         // Create Custom Item
+        const detectedType = parsedNode.type || clothingTypeInput;
         const customItem: ClothingItem = {
           id: `custom-${Date.now()}`,
-          name: parsedNode.name,
-          type: clothingTypeInput,
+          name: parsedNode.name || file.name.split('.')[0],
+          type: detectedType as any,
           imageUrl: base64String, // Use full quality upload
-          description: parsedNode.description,
-          primaryColor: parsedNode.primaryColor,
-          styleTags: parsedNode.styleTags,
-          fitAdvice: parsedNode.fitAdvice
+          description: parsedNode.description || 'Custom fashion garment.',
+          primaryColor: parsedNode.primaryColor || '#7c3aed',
+          styleTags: parsedNode.styleTags || ['Custom'],
+          fitAdvice: parsedNode.fitAdvice || 'Fits true to tailored body coordinates.'
         };
 
         setSelectedGarments(prev => {
@@ -326,7 +327,7 @@ export default function App() {
         setActivePreset(customItem.id);
         setCustomName('');
         showToast('Apparel loaded, analyzed, and worn successfully!');
-        setCameraPreset(clothingTypeInput === 'bottom' ? 'torso' : 'fullbody');
+        setCameraPreset(customItem.type === 'bottom' ? 'torso' : 'fullbody');
         setTryOnResult(null);
       };
       reader.readAsDataURL(file);
@@ -655,47 +656,6 @@ export default function App() {
 
             {/* Dynamic tabs: presets vs customized uploads */}
             <div className="flex flex-col gap-4">
-              <label className="text-[11px] uppercase tracking-wider text-slate-400 font-mono">Choose From High-Fashion Presets</label>
-              <div className="grid grid-cols-2 gap-2.5">
-                 {APPAREL_PRESETS.map((item) => {
-                   const isWorn = selectedGarments.some(g => g.id === item.id);
-                   const isHighlighted = activePreset === item.id;
-                   return (
-                     <button
-                       key={item.id}
-                       onClick={() => handlePresetSelect(item.id)}
-                       className={`p-2.5 rounded-xl border flex flex-col gap-2 items-start transition-all relative ${
-                         isWorn 
-                           ? 'border-indigo-500 bg-indigo-950/25 shadow-md ring-1 ring-indigo-500/20' 
-                           : isHighlighted
-                           ? 'border-indigo-900/60 bg-slate-900/45'
-                           : 'border-slate-800 bg-slate-950 hover:bg-slate-900'
-                       }`}
-                     >
-                       <img 
-                         src={item.imageUrl} 
-                         alt={item.name} 
-                         className="w-full h-24 object-cover rounded-lg border border-slate-800/40"
-                         referrerPolicy="no-referrer"
-                       />
-                       <div className="text-left w-full">
-                         <div className="font-bold text-[11px] leading-tight text-white truncate max-w-[120px]">{item.name}</div>
-                         <div className="flex justify-between items-center w-full mt-1">
-                           <span className="text-[9px] uppercase tracking-widest font-mono text-slate-500">{item.type}</span>
-                           {isWorn && (
-                             <span className="text-[8px] bg-indigo-900/40 text-indigo-300 font-extrabold px-1.5 py-0.5 rounded uppercase font-mono border border-indigo-500/20 scale-90">Worn</span>
-                           )}
-                         </div>
-                       </div>
-                       {isWorn && (
-                         <span className="absolute top-4 right-4 bg-indigo-500 text-white rounded-full p-0.5 shadow-md">
-                           <Check className="w-3 h-3 text-white" />
-                         </span>
-                       )}
-                     </button>
-                   );
-                 })}
-              </div>
 
               {/* URL Scraping utility form */}
               <div className="border-t border-slate-800/50 pt-4 mt-2 flex flex-col gap-3">

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AvatarParameters, ClothingItem, ClothingType } from '../types';
 import { ZoomIn, ZoomOut, Maximize, Play, Pause, Compass } from 'lucide-react';
@@ -705,12 +706,9 @@ export default function ThreeAvatarViewer({
           imageUrl,
           (texture) => {
             texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.RepeatWrapping;
-            if (type === 'top' || type === 'outerwear') {
-              texture.repeat.set(1.5, 1.5);
-            } else {
-              texture.repeat.set(1.5, 3);
-            }
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            texture.repeat.set(1, 1);
+            texture.offset.set(0.5, 0); // Centers the front design of the garment directly facing the camera
             mat.map = texture;
             // Tint with a light shade so the original uploaded pattern's actual color details are prominent
             mat.color.set('#ffffff');
@@ -1477,8 +1475,89 @@ export default function ThreeAvatarViewer({
                 child.material.envMapIntensity = 1.3;
                 child.material.needsUpdate = true;
               }
+
+              // Dynamic texture & color routing matched from global active garments state
+              const mName = child.name.toLowerCase();
+              activeGarments.forEach((garment) => {
+                const isMatch = 
+                  (garment.type === 'top' && (mName.includes('shirt') || mName.includes('top') || mName.includes('chest') || mName.includes('collar'))) ||
+                  (garment.type === 'bottom' && (mName.includes('pants') || mName.includes('legs') || mName.includes('lower') || mName.includes('jeans') || mName.includes('trousers'))) ||
+                  (garment.type === 'dress' && (mName.includes('dress') || mName.includes('gown') || mName.includes('skirt'))) ||
+                  (garment.type === 'outerwear' && (mName.includes('coat') || mName.includes('jacket') || mName.includes('outer') || mName.includes('blazer')));
+
+                if (isMatch) {
+                  const colorHex = garment.primaryColor || '#7c3aed';
+                  const isKnit = colorHex.toLowerCase() === '#d6c5b3' || garment.type === 'top' || garment.type === 'outerwear';
+                  
+                  // Construct customized MeshPhysicalMaterial matching DYNAMIC_GARMENT_MAPPING parameters
+                  const pbrMat = new THREE.MeshPhysicalMaterial({
+                    color: new THREE.Color(colorHex),
+                    roughness: garment.sheenLevel !== undefined ? (1 - garment.sheenLevel) : (isKnit ? 0.8 : 0.60),
+                    metalness: isKnit ? 0.02 : 0.12,
+                    clearcoat: garment.sheenLevel && garment.sheenLevel > 0.4 ? 0.35 : 0.0,
+                    clearcoatRoughness: 0.12,
+                    bumpMap: isKnit ? (knitBumpMap || undefined) : undefined,
+                    bumpScale: 0.015
+                  });
+
+                  if (garment.imageUrl) {
+                    const textureLoader = new THREE.TextureLoader();
+                    textureLoader.setCrossOrigin('anonymous');
+                    textureLoader.load(
+                      garment.imageUrl,
+                      (texture) => {
+                        texture.wrapS = THREE.RepeatWrapping;
+                        texture.wrapT = THREE.RepeatWrapping;
+                        if (garment.type === 'top' || garment.type === 'outerwear') {
+                          texture.repeat.set(1.5, 1.5);
+                        } else {
+                          texture.repeat.set(1.5, 3);
+                        }
+                        pbrMat.map = texture;
+                        pbrMat.color.set('#ffffff'); // Neutral tint to display uploaded pattern accurately
+                        pbrMat.needsUpdate = true;
+                      }
+                    );
+                  }
+
+                  child.material = pbrMat;
+                }
+              });
             }
           });
+
+          // Store references and helper APIs for runtime swapping on window scope as suggested
+          (window as any).avatarModel = humanModel;
+          
+          (window as any).applyClothingTexture = (clothingType: string, texturePath: string) => {
+            console.log(`[WearAI API] Swapping texture dynamically for: ${clothingType} -> ${texturePath}`);
+            const tLoader = new THREE.TextureLoader();
+            tLoader.setCrossOrigin('anonymous');
+            tLoader.load(texturePath, (texture) => {
+              humanModel.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  const meshName = child.name.toLowerCase();
+                  const isMatch = 
+                    (clothingType.includes('shirt') || clothingType.includes('top')) && (meshName.includes('shirt') || meshName.includes('top') || meshName.includes('chest')) ||
+                    (clothingType.includes('pants') || clothingType.includes('bottom')) && (meshName.includes('pants') || meshName.includes('legs') || meshName.includes('lower') || meshName.includes('jeans')) ||
+                    (clothingType.includes('shoes')) && (meshName.includes('shoes') || meshName.includes('feet') || meshName.includes('sole'));
+
+                  if (isMatch) {
+                    if (child.material) {
+                      const mat = child.material as any;
+                      mat.map = texture;
+                      mat.color.set('#ffffff');
+                      mat.needsUpdate = true;
+                    }
+                  }
+                }
+              });
+            });
+          };
+
+          (window as any).updateClothing = (clothingType: string, texturePath: string) => {
+            (window as any).applyClothingTexture(clothingType, texturePath);
+          };
         },
         undefined,
         (err) => {
@@ -1490,6 +1569,114 @@ export default function ThreeAvatarViewer({
     // Trigger loading of the photorealistic human avatar glb
     loadModel('/realistic-human.glb');
 
+
+    // ================= D3. ADVANCED CANNON.JS CLOTH PHYSICS SOLVER ENGINE =================
+    const cannonWorld = new CANNON.World();
+    cannonWorld.gravity.set(0, -9.81, 0);
+    const gsSolver = new CANNON.GSSolver();
+    gsSolver.iterations = 10;
+    gsSolver.tolerance = 0.02;
+    cannonWorld.solver = gsSolver;
+
+    interface CannonClothSim {
+      mesh: THREE.Mesh;
+      type: string;
+      radialSegs: number;
+      heightSegs: number;
+      heightVal: number;
+      bodies: CANNON.Body[];
+      parentGroup: THREE.Object3D;
+    }
+
+    const clothSimulations: CannonClothSim[] = [];
+
+    const createCannonClothSim = (
+      mesh: THREE.Mesh,
+      type: string,
+      radialSegs: number,
+      heightSegs: number,
+      heightVal: number,
+      parentGroup: THREE.Object3D,
+      radiusT: number,
+      radiusB: number
+    ) => {
+      const bodies: CANNON.Body[] = [];
+      parentGroup.updateMatrixWorld(true);
+
+      for (let h = 0; h <= heightSegs; h++) {
+        const t = h / heightSegs; // 0 to 1 (top to bottom of garment cylinder)
+        const yVal = heightVal * 0.5 - t * heightVal;
+        const radius = radiusT + t * (radiusB - radiusT);
+        
+        // Anchoring upper rings of cylinder to block sliding off bones
+        const isLocked = h <= 1; 
+        const weight = Math.pow(t, 1.6); // weight profile
+
+        for (let r = 0; r < radialSegs; r++) {
+          const angle = (r / radialSegs) * Math.PI * 2;
+          const xVal = Math.sin(angle) * radius;
+          const zVal = Math.cos(angle) * radius;
+
+          // Project default local coordinates to global three.js positions
+          const localPos = new THREE.Vector3(xVal, yVal, zVal);
+          const relativePos = localPos.clone().add(mesh.position);
+          const worldPos = relativePos.clone().applyMatrix4(parentGroup.matrixWorld);
+
+          const body = new CANNON.Body({
+            mass: isLocked ? 0 : 0.06, // Static/anchored nodes have 0 mass
+            position: new CANNON.Vec3(worldPos.x, worldPos.y, worldPos.z),
+            shape: new CANNON.Sphere(0.012),
+            linearDamping: 0.45,
+            angularDamping: 0.45
+          });
+
+          (body as any).userData = {
+            hIndex: h,
+            rIndex: r,
+            localOffset: relativePos.clone(),
+            isLocked: isLocked,
+            weight: weight
+          };
+
+          cannonWorld.addBody(body);
+          bodies.push(body);
+        }
+      }
+
+      // Physics distance constraints
+      for (let h = 0; h <= heightSegs; h++) {
+        for (let r = 0; r < radialSegs; r++) {
+          const idx = h * radialSegs + r;
+
+          // Structural horizontal ring limits
+          const nextRIdx = h * radialSegs + ((r + 1) % radialSegs);
+          const distH = bodies[idx].position.distanceTo(bodies[nextRIdx].position);
+          cannonWorld.addConstraint(new CANNON.DistanceConstraint(bodies[idx], bodies[nextRIdx], distH));
+
+          // Vertical structural hanger limits
+          if (h < heightSegs) {
+            const belowIdx = (h + 1) * radialSegs + r;
+            const distV = bodies[idx].position.distanceTo(bodies[belowIdx].position);
+            cannonWorld.addConstraint(new CANNON.DistanceConstraint(bodies[idx], bodies[belowIdx], distV));
+
+            // Diagonal shear supports preventing mesh flattening collapse
+            const diagIdx = (h + 1) * radialSegs + ((r + 1) % radialSegs);
+            const distD = bodies[idx].position.distanceTo(bodies[diagIdx].position);
+            cannonWorld.addConstraint(new CANNON.DistanceConstraint(bodies[idx], bodies[diagIdx], distD));
+          }
+        }
+      }
+
+      clothSimulations.push({
+        mesh: mesh,
+        type: type,
+        radialSegs: radialSegs,
+        heightSegs: heightSegs,
+        heightVal: heightVal,
+        bodies: bodies,
+        parentGroup: parentGroup
+      });
+    };
 
     // ================= E. LAYERED 3D APPAREL LAYER ENGINE =================
     // Sort active garments to ensure deeper clothes are drawn physically larger
@@ -1508,7 +1695,9 @@ export default function ThreeAvatarViewer({
       // Scale padding/offset based on the sorted stack layer index to prevent intersecting faces
       const scaleOffset = index * 0.012;
       const garmentMaterial = createGarmentMaterial(garment.primaryColor || '#7c3aed', garment.type, garment.imageUrl);
+      const solidMaterial = createGarmentMaterial(garment.primaryColor || '#7c3aed', garment.type); // Solid brand matching color material
       garmentMaterialsToDispose.push(garmentMaterial);
+      garmentMaterialsToDispose.push(solidMaterial);
 
       let renderOrder = 0;
       if (garment.type === 'top') renderOrder = 1;
@@ -1516,12 +1705,13 @@ export default function ThreeAvatarViewer({
       else if (garment.type === 'outerwear') renderOrder = 3;
 
       if (garment.type === 'top') {
-        const topVestGeo = new THREE.CylinderGeometry(
-          config.chestWidth * (0.525 + scaleOffset),
-          config.waistWidth * (0.535 + scaleOffset),
-          bodyHeight * 0.76,
-          24
-        );
+        const radialSegs = 16;
+        const heightSegs = 6;
+        const topHeight = bodyHeight * 0.76;
+        const radiusT = config.chestWidth * (0.525 + scaleOffset);
+        const radiusB = config.waistWidth * (0.535 + scaleOffset);
+
+        const topVestGeo = new THREE.CylinderGeometry(radiusT, radiusB, topHeight, radialSegs, heightSegs);
         const topVest = new THREE.Mesh(topVestGeo, garmentMaterial);
         topVest.position.set(0, bodyHeight * 0.14, 0);
         topVest.castShadow = true;
@@ -1529,9 +1719,11 @@ export default function ThreeAvatarViewer({
         topVest.renderOrder = renderOrder;
         torsoGroup.add(topVest);
 
+        createCannonClothSim(topVest, 'top', radialSegs, heightSegs, topHeight, torsoGroup, radiusT, radiusB);
+
         // A folded collar placket going down the center chest (matching the polo sweater in the image)
         const placketGeo = new THREE.BoxGeometry(config.chestWidth * 0.12, bodyHeight * 0.22, 0.008);
-        const placket = new THREE.Mesh(placketGeo, garmentMaterial);
+        const placket = new THREE.Mesh(placketGeo, solidMaterial);
         placket.position.set(0, bodyHeight * 0.24, config.chestThickness * 0.525 + scaleOffset * config.chestThickness);
         placket.castShadow = true;
         topVest.add(placket);
@@ -1556,13 +1748,13 @@ export default function ThreeAvatarViewer({
         const flapThickness = 0.012;
         const collarFlapGeo = new THREE.BoxGeometry(flapWidth, flapLength, flapThickness);
         
-        const leftFlap = new THREE.Mesh(collarFlapGeo, garmentMaterial);
+        const leftFlap = new THREE.Mesh(collarFlapGeo, solidMaterial);
         leftFlap.position.set(-flapWidth * 0.38, 0, config.chestThickness * 0.53 + scaleOffset * config.chestThickness);
         leftFlap.rotation.set(0.24, 0.35, -0.22); // angled fold
         leftFlap.castShadow = true;
         collarGroup.add(leftFlap);
 
-        const rightFlap = new THREE.Mesh(collarFlapGeo, garmentMaterial);
+        const rightFlap = new THREE.Mesh(collarFlapGeo, solidMaterial);
         rightFlap.position.set(flapWidth * 0.38, 0, config.chestThickness * 0.53 + scaleOffset * config.chestThickness);
         rightFlap.rotation.set(0.24, -0.35, 0.22); // angled fold opposite
         rightFlap.castShadow = true;
@@ -1570,7 +1762,7 @@ export default function ThreeAvatarViewer({
 
         // A circular back collar band wrapping the back of the neck structure
         const backCollarGeo = new THREE.CylinderGeometry(neckRadius * 1.55, neckRadius * 1.75, bodyHeight * 0.08, 16, 1, true, -Math.PI * 0.82, Math.PI * 1.64);
-        const backCollar = new THREE.Mesh(backCollarGeo, garmentMaterial);
+        const backCollar = new THREE.Mesh(backCollarGeo, solidMaterial);
         backCollar.position.set(0, bodyHeight * 0.05, -neckRadius * 0.2);
         backCollar.rotation.x = 0.12;
         collarGroup.add(backCollar);
@@ -1582,14 +1774,14 @@ export default function ThreeAvatarViewer({
           12
         );
         
-        const leftSleeve = new THREE.Mesh(sleeveGeo, garmentMaterial);
+        const leftSleeve = new THREE.Mesh(sleeveGeo, solidMaterial);
         leftSleeve.position.set(0, upperArmLength * 0.1, 0);
         leftSleeve.castShadow = true;
         leftSleeve.receiveShadow = true;
         leftSleeve.renderOrder = renderOrder;
         leftUpperArmMesh.add(leftSleeve);
 
-        const rightSleeve = new THREE.Mesh(sleeveGeo, garmentMaterial);
+        const rightSleeve = new THREE.Mesh(sleeveGeo, solidMaterial);
         rightSleeve.position.set(0, upperArmLength * 0.1, 0);
         rightSleeve.castShadow = true;
         rightSleeve.receiveShadow = true;
@@ -1597,18 +1789,22 @@ export default function ThreeAvatarViewer({
         rightUpperArmMesh.add(rightSleeve);
       }
       else if (garment.type === 'bottom') {
-        const pantsThighGeo = new THREE.CylinderGeometry(
-          thighRadius * (1.34 + scaleOffset),
-          thighRadius * (1.15 + scaleOffset),
-          thighLength * 0.95,
-          12
-        );
+        const radialSegs = 12;
+        const heightSegs = 5;
+        const thighH = thighLength * 0.95;
+        const radiusThighT = thighRadius * (1.34 + scaleOffset);
+        const radiusThighB = thighRadius * (1.15 + scaleOffset);
+
+        const pantsThighGeo = new THREE.CylinderGeometry(radiusThighT, radiusThighB, thighH, radialSegs, heightSegs);
+        
         const leftPantsThigh = new THREE.Mesh(pantsThighGeo, garmentMaterial);
         leftPantsThigh.position.set(0, -thighLength * 0.04, 0);
         leftPantsThigh.castShadow = true;
         leftPantsThigh.receiveShadow = true;
         leftPantsThigh.renderOrder = renderOrder;
         leftThighMesh.add(leftPantsThigh);
+
+        createCannonClothSim(leftPantsThigh, 'pants_left_thigh', radialSegs, heightSegs, thighH, leftThighMesh, radiusThighT, radiusThighB);
 
         const rightPantsThigh = new THREE.Mesh(pantsThighGeo, garmentMaterial);
         rightPantsThigh.position.set(0, -thighLength * 0.04, 0);
@@ -1617,12 +1813,14 @@ export default function ThreeAvatarViewer({
         rightPantsThigh.renderOrder = renderOrder;
         rightThighMesh.add(rightPantsThigh);
 
-        const pantsCalfGeo = new THREE.CylinderGeometry(
-          calfRadius * (1.25 + scaleOffset),
-          calfRadius * (1.14 + scaleOffset),
-          calfLength * 0.9,
-          12
-        );
+        createCannonClothSim(rightPantsThigh, 'pants_right_thigh', radialSegs, heightSegs, thighH, rightThighMesh, radiusThighT, radiusThighB);
+
+        const calfH = calfLength * 0.9;
+        const radiusCalfT = calfRadius * (1.25 + scaleOffset);
+        const radiusCalfB = calfRadius * (1.14 + scaleOffset);
+
+        const pantsCalfGeo = new THREE.CylinderGeometry(radiusCalfT, radiusCalfB, calfH, radialSegs, heightSegs);
+        
         const leftPantsCalf = new THREE.Mesh(pantsCalfGeo, garmentMaterial);
         leftPantsCalf.position.set(0, -calfLength * 0.04, 0);
         leftPantsCalf.castShadow = true;
@@ -1630,34 +1828,42 @@ export default function ThreeAvatarViewer({
         leftPantsCalf.renderOrder = renderOrder;
         leftCalfMesh.add(leftPantsCalf);
 
+        createCannonClothSim(leftPantsCalf, 'pants_left_calf', radialSegs, heightSegs, calfH, leftCalfMesh, radiusCalfT, radiusCalfB);
+
         const rightPantsCalf = new THREE.Mesh(pantsCalfGeo, garmentMaterial);
         rightPantsCalf.position.set(0, -calfLength * 0.04, 0);
         rightPantsCalf.castShadow = true;
         rightPantsCalf.receiveShadow = true;
         rightPantsCalf.renderOrder = renderOrder;
         rightCalfMesh.add(rightPantsCalf);
+
+        createCannonClothSim(rightPantsCalf, 'pants_right_calf', radialSegs, heightSegs, calfH, rightCalfMesh, radiusCalfT, radiusCalfB);
       }
       else if (garment.type === 'dress') {
-        const dressGeo = new THREE.CylinderGeometry(
-          config.chestWidth * (0.525 + scaleOffset),
-          config.hipWidth * (0.72 + scaleOffset),
-          bodyHeight * 1.35,
-          24
-        );
+        const radialSegs = 16;
+        const heightSegs = 8;
+        const dressH = bodyHeight * 1.35;
+        const radiusDressT = config.chestWidth * (0.525 + scaleOffset);
+        const radiusDressB = config.hipWidth * (0.72 + scaleOffset);
+
+        const dressGeo = new THREE.CylinderGeometry(radiusDressT, radiusDressB, dressH, radialSegs, heightSegs);
         const dressMesh = new THREE.Mesh(dressGeo, garmentMaterial);
         dressMesh.position.set(0, -bodyHeight * 0.15, 0);
         dressMesh.castShadow = true;
         dressMesh.receiveShadow = true;
         dressMesh.renderOrder = renderOrder;
         torsoGroup.add(dressMesh);
+
+        createCannonClothSim(dressMesh, 'dress', radialSegs, heightSegs, dressH, torsoGroup, radiusDressT, radiusDressB);
       }
       else if (garment.type === 'outerwear') {
-        const coatGeo = new THREE.CylinderGeometry(
-          config.chestWidth * (0.54 + scaleOffset),
-          config.waistWidth * (0.56 + scaleOffset),
-          bodyHeight * 0.85,
-          24
-        );
+        const radialSegs = 16;
+        const heightSegs = 8;
+        const coatH = bodyHeight * 0.85;
+        const radiusCoatT = config.chestWidth * (0.54 + scaleOffset);
+        const radiusCoatB = config.waistWidth * (0.56 + scaleOffset);
+
+        const coatGeo = new THREE.CylinderGeometry(radiusCoatT, radiusCoatB, coatH, radialSegs, heightSegs);
         const coatMesh = new THREE.Mesh(coatGeo, garmentMaterial);
         coatMesh.position.set(0, bodyHeight * 0.12, 0);
         coatMesh.castShadow = true;
@@ -1665,15 +1871,17 @@ export default function ThreeAvatarViewer({
         coatMesh.renderOrder = renderOrder;
         torsoGroup.add(coatMesh);
 
+        createCannonClothSim(coatMesh, 'outerwear', radialSegs, heightSegs, coatH, torsoGroup, radiusCoatT, radiusCoatB);
+
         const collarGeo = new THREE.BoxGeometry(config.chestWidth * 0.18, bodyHeight * 0.35, config.chestThickness * 0.22);
         
-        const leftCollar = new THREE.Mesh(collarGeo, garmentMaterial);
+        const leftCollar = new THREE.Mesh(collarGeo, solidMaterial);
         leftCollar.position.set(-config.chestWidth * 0.22, bodyHeight * 0.22, config.chestThickness * 0.44);
         leftCollar.rotation.y = 0.25;
         leftCollar.renderOrder = renderOrder;
         coatMesh.add(leftCollar);
 
-        const rightCollar = new THREE.Mesh(collarGeo, garmentMaterial);
+        const rightCollar = new THREE.Mesh(collarGeo, solidMaterial);
         rightCollar.position.set(config.chestWidth * 0.22, bodyHeight * 0.22, config.chestThickness * 0.44);
         rightCollar.rotation.y = -0.25;
         rightCollar.renderOrder = renderOrder;
@@ -1686,14 +1894,14 @@ export default function ThreeAvatarViewer({
           12
         );
         
-        const leftCoatSleeve = new THREE.Mesh(coatSleeveGeo, garmentMaterial);
+        const leftCoatSleeve = new THREE.Mesh(coatSleeveGeo, solidMaterial);
         leftCoatSleeve.position.set(0, upperArmLength * 0.05, 0);
         leftCoatSleeve.castShadow = true;
         leftCoatSleeve.receiveShadow = true;
         leftCoatSleeve.renderOrder = renderOrder;
         leftUpperArmMesh.add(leftCoatSleeve);
 
-        const rightCoatSleeve = new THREE.Mesh(coatSleeveGeo, garmentMaterial);
+        const rightCoatSleeve = new THREE.Mesh(coatSleeveGeo, solidMaterial);
         rightCoatSleeve.position.set(0, upperArmLength * 0.05, 0);
         rightCoatSleeve.castShadow = true;
         rightCoatSleeve.receiveShadow = true;
@@ -1774,6 +1982,69 @@ export default function ThreeAvatarViewer({
         }
       }
 
+      // ================= D4. CANNON.JS SIMULATION PHYSICS ITERATION CYCLE =================
+      clothSimulations.forEach(sim => {
+        sim.parentGroup.updateMatrixWorld(true);
+        sim.bodies.forEach(body => {
+          const bAny = body as any;
+          if (bAny.userData.isLocked) {
+            // Anchor coordinates snap to skeleton group transforms
+            const targetWorld = bAny.userData.localOffset.clone().applyMatrix4(sim.parentGroup.matrixWorld);
+            body.position.set(targetWorld.x, targetWorld.y, targetWorld.z);
+            body.velocity.set(0, 0, 0);
+            body.angularVelocity.set(0, 0, 0);
+          }
+        });
+      });
+
+      // Step physics
+      cannonWorld.step(0.016);
+
+      // Apply physical mesh coordinates and fold-deformations back to CylinderGeometry vertices
+      clothSimulations.forEach(sim => {
+        const geom = sim.mesh.geometry;
+        const posAttr = geom.attributes.position;
+        
+        sim.mesh.updateMatrixWorld(true);
+        const meshInvMat = sim.mesh.matrixWorld.clone().invert();
+
+        for (let i = 0; i < posAttr.count; i++) {
+          const hIndex = Math.min(sim.heightSegs, Math.floor(i / (sim.radialSegs + 1)));
+          const rIndex = i % (sim.radialSegs + 1);
+          const rClamped = rIndex % sim.radialSegs;
+
+          const bodyIndex = hIndex * sim.radialSegs + rClamped;
+          const body = sim.bodies[bodyIndex];
+
+          if (body) {
+            const bAny = body as any;
+            const worldPos = new THREE.Vector3(body.position.x, body.position.y, body.position.z);
+            const localPos = worldPos.applyMatrix4(meshInvMat);
+
+            let wrinkleOffset = 0;
+            if (animationMode === 'walk' && !bAny.userData.isLocked) {
+              // Simulating elegant multi-layer wrinkled creasing
+              const cycleSpeed = 3.6;
+              const anglePhase = (rIndex / sim.radialSegs) * Math.PI * 4;
+              const heightPhase = bAny.userData.hIndex * 1.5;
+              const tPhase = animationClock * cycleSpeed;
+              
+              const sinWave = Math.sin(heightPhase - tPhase + anglePhase * 0.5);
+              wrinkleOffset = sinWave * 0.006 * bAny.userData.weight;
+            }
+
+            posAttr.setXYZ(
+              i,
+              localPos.x + wrinkleOffset * 0.3,
+              localPos.y,
+              localPos.z + wrinkleOffset
+            );
+          }
+        }
+        posAttr.needsUpdate = true;
+        geom.computeVertexNormals();
+      });
+
       renderer.render(scene, camera);
       requestId = requestAnimationFrame(renderAnim);
     };
@@ -1799,6 +2070,13 @@ export default function ThreeAvatarViewer({
     return () => {
       cancelAnimationFrame(requestId);
       sizeObserver.disconnect();
+      
+      // Clean up Cannon bodies and constraints to prevent memory leaks
+      clothSimulations.forEach(sim => {
+        sim.bodies.forEach(body => {
+          cannonWorld.removeBody(body);
+        });
+      });
       pelvisGeo.dispose();
       waistGeo.dispose();
       chestGeo.dispose();
