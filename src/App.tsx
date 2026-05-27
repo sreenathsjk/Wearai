@@ -18,7 +18,8 @@ import {
   ChevronRight,
   TrendingUp,
   Download,
-  AlertCircle
+  AlertCircle,
+  Dna
 } from 'lucide-react';
 import ThreeAvatarViewer from './components/ThreeAvatarViewer';
 import { AvatarParameters, ClothingItem, TryOnResult, ScrapedProduct, SavedTryOn } from './types';
@@ -27,13 +28,27 @@ import { AvatarParameters, ClothingItem, TryOnResult, ScrapedProduct, SavedTryOn
 const APPAREL_PRESETS: ClothingItem[] = [
   {
     id: 'garment-1',
-    name: 'CyberKnit Ribbed Turtleneck',
+    name: 'Sandstone Ribbed Knit Polo',
     type: 'top',
-    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80',
-    description: 'A luxurious ribbed modal knit top combining structural compression seams with a high-neck profile.',
-    primaryColor: '#e2e8f0',
-    styleTags: ['Minimalist', 'Tailored', 'Contemporary'],
-    fitAdvice: 'Highly elastic. Recommends a tailored skin-tight stretch.'
+    imageUrl: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?w=800&auto=format&fit=crop&q=80',
+    description: 'A tailored sandstone beige polo sweater featuring an elegant fold-over collar and textured ribbed knitting.',
+    primaryColor: '#d6c5b3',
+    styleTags: ['Knitwear', 'Polo', 'Classic', 'Sartorial'],
+    fitAdvice: 'True to size. Fitted ribbed stretch collar.',
+    secondaryColors: ['#bcaea1'],
+    pantoneMatch: 'TCX 14-1116',
+    fabricType: 'Ribbed Knit Cotton',
+    weavePattern: 'Woven Knit Rib',
+    surfaceFinish: 'Textured Matte',
+    sheenLevel: 0.04,
+    weightClass: 'Medium Weight',
+    stretchFactor: 'Medium Stretch (15-20%)',
+    neckline: 'Polo Fold Collar',
+    sleeveStyle: 'Short Sleeve',
+    fitType: 'Fitted',
+    patternType: 'Solid Ribbed',
+    patternScale: 'Micro',
+    embellishments: ['Two-button functional placket']
   },
   {
     id: 'garment-2',
@@ -43,17 +58,45 @@ const APPAREL_PRESETS: ClothingItem[] = [
     description: 'Double-breasted gabardine coat crafted with broad lapels and modular storm vents, tailored for all climates.',
     primaryColor: '#78350f',
     styleTags: ['Structured', 'Corporate', 'Classy'],
-    fitAdvice: 'Rigid structure. Size up if aiming to layer heavily.'
+    fitAdvice: 'Rigid structure. Size up if aiming to layer heavily.',
+    secondaryColors: ['#1e1b4b'],
+    pantoneMatch: 'TCX 19-1220',
+    fabricType: 'Heavy Gabardine',
+    weavePattern: 'Twill Weave',
+    surfaceFinish: 'Semi-Matte Satin',
+    sheenLevel: 0.15,
+    weightClass: 'Heavyweight',
+    stretchFactor: 'Rigid (0-5%)',
+    neckline: 'Double Lapel',
+    sleeveStyle: 'Long Cuffed Sleeve',
+    fitType: 'Regular Fit',
+    patternType: 'Solid',
+    patternScale: 'None',
+    embellishments: ['Contrast vintage buttons', 'Belt closure']
   },
   {
     id: 'garment-3',
-    name: 'Classic Pleated Slate Jeans',
+    name: 'Classic Light-Wash Denim',
     type: 'bottom',
     imageUrl: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&auto=format&fit=crop&q=80',
-    description: 'Raw-indigo canvas construction with elegant leg creases, featuring tailored side hems.',
-    primaryColor: '#1e293b',
-    styleTags: ['Denim', 'Everyday', 'Workwear'],
-    fitAdvice: 'Structured waist with relaxed thigh width parameters.'
+    description: 'Comfortable light-blue denim construction with a relaxed straight-leg draping and leg creases.',
+    primaryColor: '#abc8e2',
+    styleTags: ['Denim', 'Light-Wash', 'Everyday'],
+    fitAdvice: 'Straight leg drape. Standard waist fit.',
+    secondaryColors: ['#ffffff', '#e2e8f0'],
+    pantoneMatch: 'TCX 14-4115',
+    fabricType: 'Aged Denim Cotton',
+    weavePattern: 'Twill Weave',
+    surfaceFinish: 'Matte distressed',
+    sheenLevel: 0.05,
+    weightClass: 'Heavyweight',
+    stretchFactor: 'Minimal Stretch (2-5%)',
+    neckline: 'High-Rise Waist',
+    sleeveStyle: 'None',
+    fitType: 'Relaxed Fit',
+    patternType: 'Blue Indigo Distress',
+    patternScale: 'Large',
+    embellishments: ['Stitched silver rivets', 'Golden seam contrast thread']
   },
   {
     id: 'garment-4',
@@ -63,7 +106,21 @@ const APPAREL_PRESETS: ClothingItem[] = [
     description: 'An ethereal luxury midi dress combining dynamic bias drape flows with subtle adjustable shoulder structures.',
     primaryColor: '#9f1239',
     styleTags: ['Elegant', 'Formal', 'Fluid'],
-    fitAdvice: 'Flowy chest fit. Adjustable waist wraps easily.'
+    fitAdvice: 'Flowy chest fit. Adjustable waist wraps easily.',
+    secondaryColors: ['#f43f5e'],
+    pantoneMatch: 'TCX 19-1763',
+    fabricType: 'Organic Mulberry Silk',
+    weavePattern: 'Satin Weave',
+    surfaceFinish: 'Glossy Silk Sheen',
+    sheenLevel: 0.45,
+    weightClass: 'Lightweight',
+    stretchFactor: 'Slight Bias Stretch (10%)',
+    neckline: 'V-Neck Wrap',
+    sleeveStyle: 'Sleeveless',
+    fitType: 'Fluid Silhouette',
+    patternType: 'Solid Flowing',
+    patternScale: 'None',
+    embellishments: ['Invisible zipper', 'Subtle adjustable shoulder ribbons']
   }
 ];
 
@@ -78,22 +135,20 @@ const SKIN_TONE_PRESETS = [
 export default function App() {
   // 1. STATE INITIALIZATION
   const [avatar, setAvatar] = useState<AvatarParameters>({
-    age: 26,
-    gender: 'female',
+    age: 25,
+    gender: 'male',
     bodyShape: 'athletic',
-    skinTone: '#e8be96',
-    height: 172,
-    weight: 62
+    skinTone: '#b28a6f',
+    height: 183,
+    weight: 76
   });
 
   const [activePreset, setActivePreset] = useState<string>('garment-1');
   const [activeGarment, setActiveGarment] = useState<ClothingItem>(APPAREL_PRESETS[0]);
-  const [selectedGarments, setSelectedGarments] = useState<Record<'top' | 'bottom' | 'dress' | 'outerwear', ClothingItem | null>>({
-    top: APPAREL_PRESETS[0],
-    bottom: APPAREL_PRESETS[2],
-    dress: null,
-    outerwear: null
-  });
+  const [selectedGarments, setSelectedGarments] = useState<ClothingItem[]>([
+    APPAREL_PRESETS[0], // Sandstone Ribbed Knit Polo (top)
+    APPAREL_PRESETS[2], // Classic Light-Wash Denim (bottom)
+  ]);
   
   // Custom Product additions states
   const [clothingTypeInput, setClothingTypeInput] = useState<'top' | 'bottom' | 'dress' | 'outerwear'>('top');
@@ -143,23 +198,21 @@ export default function App() {
     const item = APPAREL_PRESETS.find(p => p.id === id);
     if (item) {
       setSelectedGarments(prev => {
-        const isAlreadyWorn = prev[item.type]?.id === id;
-        const next = { ...prev };
+        const isAlreadyWorn = prev.some(g => g.id === id);
         if (isAlreadyWorn) {
-          next[item.type] = null; // Undress category item
           showToast(`Shed ${item.name} from model!`);
+          return prev.filter(g => g.id !== id);
         } else {
-          // If dress is worn, clear other conflicting lower/upper overlays
-          if (item.type === 'dress') {
-            next.top = null;
-            next.bottom = null;
-          } else if (item.type === 'top' || item.type === 'bottom') {
-            next.dress = null;
-          }
-          next[item.type] = item; // Wear category item
           showToast(`Wearing ${item.name}!`);
+          let next = [...prev];
+          if (item.type === 'dress') {
+            next = next.filter(g => g.type !== 'top' && g.type !== 'bottom' && g.type !== 'dress');
+          } else if (item.type === 'top' || item.type === 'bottom') {
+            next = next.filter(g => g.type !== 'dress');
+          }
+          next = next.filter(g => g.id !== id);
+          return [...next, item];
         }
-        return next;
       });
       setActivePreset(id);
       setActiveGarment(item);
@@ -199,15 +252,14 @@ export default function App() {
       };
 
       setSelectedGarments(prev => {
-        const next = { ...prev };
+        let next = [...prev];
         if (scrapedItem.type === 'dress') {
-          next.top = null;
-          next.bottom = null;
+          next = next.filter(g => g.type !== 'top' && g.type !== 'bottom' && g.type !== 'dress');
         } else if (scrapedItem.type === 'top' || scrapedItem.type === 'bottom') {
-          next.dress = null;
+          next = next.filter(g => g.type !== 'dress');
         }
-        next[scrapedItem.type] = scrapedItem;
-        return next;
+        next = next.filter(g => g.type !== scrapedItem.type);
+        return [...next, scrapedItem];
       });
       setActiveGarment(scrapedItem);
       setActivePreset(scrapedItem.id);
@@ -261,15 +313,14 @@ export default function App() {
         };
 
         setSelectedGarments(prev => {
-          const next = { ...prev };
+          let next = [...prev];
           if (customItem.type === 'dress') {
-            next.top = null;
-            next.bottom = null;
+            next = next.filter(g => g.type !== 'top' && g.type !== 'bottom' && g.type !== 'dress');
           } else if (customItem.type === 'top' || customItem.type === 'bottom') {
-            next.dress = null;
+            next = next.filter(g => g.type !== 'dress');
           }
-          next[customItem.type] = customItem;
-          return next;
+          next = next.filter(g => g.type !== customItem.type);
+          return [...next, customItem];
         });
         setActiveGarment(customItem);
         setActivePreset(customItem.id);
@@ -607,7 +658,7 @@ export default function App() {
               <label className="text-[11px] uppercase tracking-wider text-slate-400 font-mono">Choose From High-Fashion Presets</label>
               <div className="grid grid-cols-2 gap-2.5">
                  {APPAREL_PRESETS.map((item) => {
-                   const isWorn = selectedGarments[item.type]?.id === item.id;
+                   const isWorn = selectedGarments.some(g => g.id === item.id);
                    const isHighlighted = activePreset === item.id;
                    return (
                      <button
@@ -722,6 +773,92 @@ export default function App() {
 
             </div>
           </div>
+
+          {/* C. DYNAMIC GARMENT SPEC SHEET (PBR & DETAILED REPORT) */}
+          {activeGarment && (
+            <div className="bg-slate-900/40 backdrop-blur-md rounded-2xl p-5 border border-slate-800/80 flex flex-col gap-4 text-left">
+              <div className="flex justify-between items-center border-b border-slate-800/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <Dna className="w-4 h-4 text-purple-400" />
+                  <h2 className="font-display font-bold text-sm tracking-tight text-white">Fabric Deconstruction</h2>
+                </div>
+                <span className="font-mono text-[9px] bg-slate-850 px-2 py-0.5 rounded text-cyan-400 border border-slate-800 uppercase tracking-widest font-extrabold animate-pulse">PBR-Active</span>
+              </div>
+              
+              {/* Image thumbnail and name */}
+              <div className="flex gap-3 items-center bg-slate-950/40 p-2.5 rounded-xl border border-slate-850">
+                <img 
+                  src={activeGarment.imageUrl} 
+                  alt={activeGarment.name} 
+                  className="w-12 h-12 object-cover rounded-lg border border-slate-800"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-white truncate">{activeGarment.name}</div>
+                  <div className="text-[10px] text-slate-450 font-mono mt-0.5 flex gap-1.5 uppercase font-bold text-left">
+                    <span className="text-indigo-400">{activeGarment.type}</span>
+                    <span>•</span>
+                    <span className="text-pink-400">{activeGarment.fabricType || "Knit Cotton"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid of properties */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-950/20 border border-slate-850/80 p-2 rounded-xl text-left">
+                  <div className="text-[8px] font-mono uppercase tracking-wider text-slate-500">Pantone Match</div>
+                  <div className="text-[10px] font-semibold text-slate-300 truncate mt-0.5">{activeGarment.pantoneMatch || "TCX 14-1116"}</div>
+                </div>
+                <div className="bg-slate-950/20 border border-slate-850/80 p-2 rounded-xl text-left">
+                  <div className="text-[8px] font-mono uppercase tracking-wider text-slate-500">Weave Pattern</div>
+                  <div className="text-[10px] font-semibold text-slate-300 truncate mt-0.5">{activeGarment.weavePattern || "Plain Weave"}</div>
+                </div>
+                <div className="bg-slate-950/20 border border-slate-850/80 p-2 rounded-xl text-left">
+                  <div className="text-[8px] font-mono uppercase tracking-wider text-slate-500">Surface Finish</div>
+                  <div className="text-[10px] font-semibold text-slate-300 truncate mt-0.5">{activeGarment.surfaceFinish || "Textured Matte"}</div>
+                </div>
+                <div className="bg-slate-950/20 border border-slate-850/80 p-2 rounded-xl text-left">
+                  <div className="text-[8px] font-mono uppercase tracking-wider text-slate-500">Stretch Class</div>
+                  <div className="text-[10px] font-semibold text-slate-300 truncate mt-0.5">{activeGarment.stretchFactor || "Low Stretch"}</div>
+                </div>
+                <div className="bg-slate-950/20 border border-slate-850/80 p-2 rounded-xl text-left">
+                  <div className="text-[8px] font-mono uppercase tracking-wider text-slate-500">Neck & Collar</div>
+                  <div className="text-[10px] font-semibold text-slate-300 truncate mt-0.5">{activeGarment.neckline || "Crew Neck"}</div>
+                </div>
+                <div className="bg-slate-950/20 border border-slate-850/80 p-2 rounded-xl text-left">
+                  <div className="text-[8px] font-mono uppercase tracking-wider text-slate-500">Silhouette Fit</div>
+                  <div className="text-[10px] font-semibold text-slate-300 truncate mt-0.5">{activeGarment.fitType || "Regular"}</div>
+                </div>
+              </div>
+
+              {/* Pattern detail and weight */}
+              <div className="flex flex-col gap-2 bg-slate-950/30 border border-slate-850 p-3 rounded-xl">
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-500 font-mono">PATTERN TYPE:</span>
+                  <span className="text-slate-300 font-bold uppercase">{activeGarment.patternType || "Solid Color"} (Scale: {activeGarment.patternScale || "None"})</span>
+                </div>
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-500 font-mono">FABRIC SHEEN:</span>
+                  <div className="flex items-center gap-1.5 flex-1 max-w-[124px] ml-auto">
+                    <div className="h-1.5 bg-slate-900 rounded-full w-full overflow-hidden flex">
+                      <div className="bg-cyan-500 h-full" style={{ width: `${(activeGarment.sheenLevel || 0.1) * 100}%` }} />
+                    </div>
+                    <span className="text-slate-300 font-mono font-bold">{(activeGarment.sheenLevel || 0.1).toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-500 font-mono">WEIGHT CLASS:</span>
+                  <span className="text-slate-300 font-bold uppercase">{activeGarment.weightClass || "Medium"}</span>
+                </div>
+                {activeGarment.embellishments && activeGarment.embellishments.length > 0 && (
+                  <div className="flex justify-between items-start text-[10px] border-t border-slate-850 pt-2 mt-1">
+                    <span className="text-slate-500 font-mono">DETAILS:</span>
+                    <span className="text-slate-300 font-bold text-right truncate max-w-[150px]">{activeGarment.embellishments.join(", ")}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
         </section>
 

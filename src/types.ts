@@ -23,6 +23,22 @@ export interface ClothingItem {
   styleTags?: string[];
   primaryColor?: string;
   fitAdvice?: string;
+  
+  // DYNAMIC_GARMENT_MAPPING properties
+  secondaryColors?: string[];
+  pantoneMatch?: string;
+  fabricType?: string;
+  weavePattern?: string;
+  surfaceFinish?: string;
+  sheenLevel?: number;
+  weightClass?: string;
+  stretchFactor?: string;
+  neckline?: string;
+  sleeveStyle?: string;
+  fitType?: string;
+  patternType?: string;
+  patternScale?: string;
+  embellishments?: string[];
 }
 
 export interface TryOnResult {

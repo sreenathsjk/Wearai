@@ -249,17 +249,45 @@ async function startServer() {
         primaryColor: string;
         styleTags: string[];
         fitAdvice: string;
+        secondaryColors?: string[];
+        pantoneMatch?: string;
+        fabricType?: string;
+        weavePattern?: string;
+        surfaceFinish?: string;
+        sheenLevel?: number;
+        weightClass?: string;
+        stretchFactor?: string;
+        neckline?: string;
+        sleeveStyle?: string;
+        fitType?: string;
+        patternType?: string;
+        patternScale?: string;
+        embellishments?: string[];
       } = {
         name: name || "Custom Apparel Asset",
         type: "top",
         description: "A tailored fashion asset loaded directly from client device.",
         primaryColor: "#334155",
         styleTags: ["Casual", "Structured"],
-        fitAdvice: "Fits true to size on standard customizable skeletal frame."
+        fitAdvice: "Fits true to size on standard customizable skeletal frame.",
+        secondaryColors: ["#e2e8f0"],
+        pantoneMatch: "TCX 18-4005",
+        fabricType: "Cotton Blend",
+        weavePattern: "Plain Weave",
+        surfaceFinish: "Matte",
+        sheenLevel: 0.1,
+        weightClass: "Medium Weight",
+        stretchFactor: "Low Stretch (5-10%)",
+        neckline: "Crew Neck",
+        sleeveStyle: "Short Sleeve",
+        fitType: "Regular Fit",
+        patternType: "Solid Color",
+        patternScale: "None",
+        embellishments: ["Self-Fabric Trim"]
       };
 
       if (ai && parsedImage) {
-        console.log("Analyzing clothing details with Gemini v3.5 Flash...");
+        console.log("Analyzing clothing details with Gemini v3.5 Flash under DYNAMIC_GARMENT_MAPPING...");
         const imagePart = {
           inlineData: {
             mimeType: parsedImage.mimeType,
@@ -268,16 +296,30 @@ async function startServer() {
         };
 
         const textPart = {
-          text: `Analyze this clothing image for virtual try-on asset creation.
-          Extract:
+          text: `Analyze this clothing image for high-fidelity virtual try-on and PBR texture creation as part of the advanced DYNAMIC_GARMENT_MAPPING protocol.
+          Detect and extract EXACTLY:
           1. The name/title of this garment.
-          2. The type of garment (Choose exactly one of: top, bottom, dress, outerwear).
-          3. A professional styling description of the material, neck style, cut, and patterns.
+          2. The type of garment (Must choose exactly one of: top, bottom, dress, outerwear).
+          3. A professional styling description of the materials, cut, and details.
           4. The primary dominant HEX color from this garment.
-          5. 2-4 fashion subcategory style tags (e.g. Minimalist, Oversized, Corporate, Casual).
-          6. Dynamic body-fitting size calibration advice based on material rigidity.
+          5. 2-4 fashion subcategory style tags.
+          6. Dynamic body-fitting size calibration advice.
+          7. Secondary colors: List of secondary visible colors in HEX format.
+          8. Pantone match: Proximity match identifier, e.g. "TCX 19-4052".
+          9. Fabric type: cotton, denim, knit, silk, wool, leather, suede, polyester, etc.
+          10. Weave pattern: ribbed, plain, sateen, twill, herringbone, etc.
+          11. Surface finish: matte, satin, glossy, semi-glossy, etc.
+          12. Sheen level: number between 0.0 (totally matte) and 1.0 (highly glossy metallic).
+          13. Weight class: Lightweight, Medium Weight, Heavyweight.
+          14. Stretch factor: e.g. "None", "Low Stretch (5-10%)", "High Stretch (20-30%)".
+          15. Neckline: Crew neck, V-neck, polo, turtleneck, wrap, scoop, etc.
+          16. Sleeve style: sleeveless, short, long, cuffed, etc.
+          17. Fit type: regular, slim, relaxed, oversized, fitted.
+          18. Pattern type: solid color, stripes, plaid, floral, geometric, distressed.
+          19. Pattern scale: micro, small, medium, large, or none.
+          20. Embellishments: buttons, zippers, stitching accents, raw hems, none.
           
-          Return a strict JSON object structure following the requested properties.`
+          Return a strict JSON object structure complying exactly with the requested schema properties.`
         };
 
         const response = await ai.models.generateContent({
@@ -293,9 +335,28 @@ async function startServer() {
                 description: { type: Type.STRING },
                 primaryColor: { type: Type.STRING, description: "Hex value like #64748B" },
                 styleTags: { type: Type.ARRAY, items: { type: Type.STRING } },
-                fitAdvice: { type: Type.STRING }
+                fitAdvice: { type: Type.STRING },
+                secondaryColors: { type: Type.ARRAY, items: { type: Type.STRING } },
+                pantoneMatch: { type: Type.STRING },
+                fabricType: { type: Type.STRING },
+                weavePattern: { type: Type.STRING },
+                surfaceFinish: { type: Type.STRING },
+                sheenLevel: { type: Type.NUMBER },
+                weightClass: { type: Type.STRING },
+                stretchFactor: { type: Type.STRING },
+                neckline: { type: Type.STRING },
+                sleeveStyle: { type: Type.STRING },
+                fitType: { type: Type.STRING },
+                patternType: { type: Type.STRING },
+                patternScale: { type: Type.STRING },
+                embellishments: { type: Type.ARRAY, items: { type: Type.STRING } }
               },
-              required: ["name", "type", "description", "primaryColor", "styleTags", "fitAdvice"]
+              required: [
+                "name", "type", "description", "primaryColor", "styleTags", "fitAdvice", 
+                "secondaryColors", "pantoneMatch", "fabricType", "weavePattern", 
+                "surfaceFinish", "sheenLevel", "weightClass", "stretchFactor", 
+                "neckline", "sleeveStyle", "fitType", "patternType", "patternScale", "embellishments"
+              ]
             }
           }
         });
@@ -308,7 +369,21 @@ async function startServer() {
             description: data.description || clothingData.description,
             primaryColor: data.primaryColor || clothingData.primaryColor,
             styleTags: data.styleTags || clothingData.styleTags,
-            fitAdvice: data.fitAdvice || clothingData.fitAdvice
+            fitAdvice: data.fitAdvice || clothingData.fitAdvice,
+            secondaryColors: data.secondaryColors || clothingData.secondaryColors,
+            pantoneMatch: data.pantoneMatch || clothingData.pantoneMatch,
+            fabricType: data.fabricType || clothingData.fabricType,
+            weavePattern: data.weavePattern || clothingData.weavePattern,
+            surfaceFinish: data.surfaceFinish || clothingData.surfaceFinish,
+            sheenLevel: data.sheenLevel !== undefined ? data.sheenLevel : clothingData.sheenLevel,
+            weightClass: data.weightClass || clothingData.weightClass,
+            stretchFactor: data.stretchFactor || clothingData.stretchFactor,
+            neckline: data.neckline || clothingData.neckline,
+            sleeveStyle: data.sleeveStyle || clothingData.sleeveStyle,
+            fitType: data.fitType || clothingData.fitType,
+            patternType: data.patternType || clothingData.patternType,
+            patternScale: data.patternScale || clothingData.patternScale,
+            embellishments: data.embellishments || clothingData.embellishments
           };
         }
       } else {
